@@ -95,6 +95,18 @@ The best hyperparameter configuration achieved 95.55% validation accuracy during
 
 *These values correspond to the recorded notebook run and are not a cross-validation estimate.*
 
+### Training Performance
+
+The following plots illustrate the model's training and validation accuracy and loss across epochs.
+
+![Training and Validation Curves](results/figures/training_curves.png)
+
+### Confusion Matrix
+
+The row-normalized confusion matrix illustrates the classification performance across the seven rice leaf disease categories.
+
+![Normalized Confusion Matrix](results/figures/confusion_matrix.png)
+
 ## Technologies Used
 
 - Python
@@ -114,8 +126,13 @@ The best hyperparameter configuration achieved 95.55% validation accuracy during
 rice-leaf-disease-classification/
 │
 ├── README.md
+│
 ├── rice_leaf_disease_classification.ipynb
-└── LICENSE
+│
+└── results/
+    └── figures/
+        ├── training_curves.png
+        └── confusion_matrix.png
 ```
 
 ## How to Run
