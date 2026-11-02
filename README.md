@@ -1,29 +1,35 @@
 # Rice Leaf Disease Classification Using DenseNet121
 
-**A deep learning-based image classification pipeline for identifying seven rice leaf disease categories using transfer learning, hyperparameter optimization, and test-time augmentation.**
+**A deep learning-based multi-class rice leaf disease classification project using transfer learning, high-resolution image processing, class imbalance handling, two-phase fine-tuning, and test-time augmentation.**
 
 ## Overview
 
-This project develops a multi-class rice leaf disease classification system using **DenseNet121 with ImageNet-pretrained weights**. The implementation focuses on improving classification performance through higher-resolution image processing, class imbalance handling, systematic hyperparameter optimization, and a two-phase fine-tuning strategy.
+This project implements a deep learning pipeline for classifying seven rice leaf disease categories using **DenseNet121 with ImageNet-pretrained weights**.
 
-The pipeline also incorporates Test-Time Augmentation (TTA), mixed-precision training, and automated learning-rate scheduling to improve inference robustness and training efficiency.
+The implementation focuses on improving classification performance through higher-resolution image processing, data augmentation, class-weighted training, and a two-phase fine-tuning strategy. It also incorporates mixed-precision computation and Test-Time Augmentation (TTA) to support efficient training and more robust inference.
+
+The final recorded experiment achieved **96.70% accuracy** on a held-out test set of 1,122 images.
 
 ## Key Features
 
-- **Transfer Learning:** DenseNet121 pretrained on ImageNet, with a custom classification head.
-- **High-Resolution Processing:** Uses 288 × 384 input images to preserve spatial details.
-- **Data Augmentation:** Random flipping, rotation, zoom, translation, brightness, and contrast transformations.
-- **Class Imbalance Handling:** Uses softened class weights based on balanced class frequencies.
+- **Transfer Learning:** Uses ImageNet-pretrained DenseNet121 as the feature extraction backbone.
+- **Custom Classification Head:** Incorporates Global Average Pooling, dropout layers, a 256-unit fully connected layer, and a seven-class softmax output.
+- **High-Resolution Image Processing:** Uses 288 × 384 input images while preserving the original 3:4 aspect ratio.
+- **Data Augmentation:** Applies random horizontal and vertical flipping, rotation, zoom, translation, brightness adjustment, and contrast adjustment.
+- **Class Imbalance Handling:** Implements softened class weights using the square root of balanced class weights.
 - **Two-Phase Fine-Tuning:** Initially trains the classification head with a frozen backbone, followed by full-backbone fine-tuning.
-- **Hyperparameter Optimization:** Evaluates eight configurations using validation performance.
-- **Mixed-Precision Training:** Uses mixed float16 computation when a compatible GPU is available.
+- **Learning Rate Scheduling:** Uses ReduceLROnPlateau and EarlyStopping callbacks.
+- **Mixed-Precision Training:** Enables mixed float16 computation when a compatible GPU is available.
 - **Test-Time Augmentation:** Averages predictions from original, horizontally flipped, vertically flipped, and doubly flipped images.
+- **Reproducibility:** Sets random seeds for Python, NumPy, and TensorFlow.
 
 ## Dataset
 
-**Source:** [Kaggle - Paddy Disease Classification](https://www.kaggle.com/competitions/paddy-disease-classification/data)
+**Source:** [Kaggle – Paddy Disease Classification](https://www.kaggle.com/competitions/paddy-disease-classification/data)
 
-The project uses seven disease categories from the training dataset.
+The original Kaggle dataset contains additional categories. This implementation selects seven disease categories using the `KEEP_CLASSES` configuration.
+
+### Selected Disease Categories
 
 | Disease Category | Number of Images |
 |---|---:|
@@ -38,7 +44,7 @@ The project uses seven disease categories from the training dataset.
 
 ### Dataset Splitting
 
-The dataset is divided using stratified sampling:
+The dataset is divided using stratified sampling with a fixed random seed.
 
 | Subset | Images | Percentage |
 |---|---:|---:|
@@ -47,78 +53,128 @@ The dataset is divided using stratified sampling:
 | Testing | 1,122 | 20% |
 | **Total** | **5,607** | **100%** |
 
-The validation set is separated from the training portion, keeping the held-out test set independent of training and model-selection callbacks.
+The validation set is separated from the training portion, while the held-out test set is reserved for final evaluation.
 
 ## Model Architecture
 
-The classification architecture is based on DenseNet121 with ImageNet-pretrained weights.
+The proposed classification model is based on DenseNet121 with ImageNet-pretrained weights and a custom classification head.
 
-The custom classification head consists of:
+### Architecture Components
 
-1. Global Average Pooling
-2. Dropout
-3. Fully Connected Layer (512 neurons, ReLU activation)
-4. Dropout
-5. Output Layer (7 neurons, Softmax activation)
+1. DenseNet121 backbone with ImageNet-pretrained weights.
+2. Global Average Pooling layer.
+3. Dropout layer (0.5).
+4. Fully Connected layer (256 neurons, ReLU activation).
+5. Dropout layer (0.3).
+6. Output layer (7 neurons, Softmax activation).
 
-## Training Strategy
+### Input Configuration
+
+| Parameter | Configuration |
+|---|---|
+| Input resolution | 288 × 384 |
+| Color channels | RGB |
+| Batch size | 32 |
+| Backbone | DenseNet121 |
+| Pretrained weights | ImageNet |
+| Output classes | 7 |
+
+## Training Methodology
+
+The model is trained using a two-phase transfer learning strategy.
 
 ### Phase 1: Classification Head Training
 
 - Freeze the pretrained DenseNet121 backbone.
-- Train the newly added classification head.
-- Use the Adam optimizer with the selected learning rate.
+- Train only the newly added classification head.
+- Use the Adam optimizer with a learning rate of 0.001.
+- Train for up to 8 epochs.
 
-### Phase 2: Fine-Tuning
+### Phase 2: Full-Backbone Fine-Tuning
 
-- Unfreeze the complete DenseNet121 backbone.
-- Fine-tune the network using a lower learning rate.
-- Apply early stopping and adaptive learning-rate reduction.
+- Unfreeze the entire DenseNet121 backbone.
+- Fine-tune the complete network, including the classification head.
+- Use the Adam optimizer with an initial learning rate of 0.0001.
+- Train for up to 45 epochs.
+- Apply adaptive learning-rate reduction and early stopping based on validation loss.
 
-### Hyperparameter Optimization
+### Additional Training Strategies
 
-Eight hyperparameter configurations are evaluated using the validation set. The selected configuration includes learning rates, dropout probabilities, dense-layer size, and label-smoothing settings.
+**Class Imbalance Handling**
+
+Balanced class weights are calculated from the training distribution and softened using their square roots before being passed to the training procedure.
+
+**Label Smoothing**
+
+Categorical cross-entropy with a label smoothing factor of 0.1 is used to regularize classification predictions.
+
+**Data Augmentation**
+
+The training pipeline applies six transformations:
+
+- Random horizontal and vertical flipping.
+- Random rotation (approximately ±20 degrees).
+- Random zoom.
+- Random translation.
+- Random brightness adjustment.
+- Random contrast adjustment.
+
+**Mixed Precision**
+
+Mixed float16 precision is enabled when a compatible GPU is detected. The final classification layer uses float32 output for numerical stability.
+
+**Test-Time Augmentation (TTA)**
+
+During evaluation, four versions of each image are considered:
+
+1. Original image.
+2. Horizontally flipped image.
+3. Vertically flipped image.
+4. Horizontally and vertically flipped image.
+
+The four sets of predicted probabilities are averaged to obtain the final prediction.
 
 ## Experimental Results
 
-The recorded final experiment achieved the following results on the held-out test set:
+The final recorded experiment achieved **96.70% overall test accuracy** on the held-out test dataset.
+
+### Overall Evaluation Metrics
+
+The following metrics are calculated from the final test confusion matrix. Sensitivity, specificity, precision, and F-score are macro-averaged across the seven classes.
 
 | Evaluation Metric | Score |
 |---|---:|
-| Accuracy | 93.58% |
-| Sensitivity | 95.24% |
-| Specificity | 98.89% |
-| Precision | 93.94% |
-| F1-score | 94.50% |
+| Test Accuracy | 96.70% |
+| Sensitivity | 97.01% |
+| Specificity | 99.42% |
+| Precision | 96.84% |
+| F1-score | 96.92% |
 
-The best hyperparameter configuration achieved 95.55% validation accuracy during the tuning experiments.
+### Training and Validation Performance
 
-*These values correspond to the recorded notebook run and are not a cross-validation estimate.*
-
-### Training Performance
-
-The following plots illustrate the model's training and validation accuracy and loss across epochs.
+The following plots illustrate the training and validation loss and accuracy throughout the two-phase training process.
 
 ![Training and Validation Curves](results/figures/training_curves.png)
 
 ### Confusion Matrix
 
-The row-normalized confusion matrix illustrates the classification performance across the seven rice leaf disease categories.
+The row-normalized confusion matrix presents the classification performance across the seven rice leaf disease categories.
 
 ![Normalized Confusion Matrix](results/figures/confusion_matrix.png)
 
-## Technologies Used
+## Technologies and Libraries
 
-- Python
-- TensorFlow
-- Keras
-- DenseNet121
-- NumPy
-- Pandas
-- Scikit-learn
-- Matplotlib
-- Seaborn
-- SciPy
+| Category | Technologies |
+|---|---|
+| Programming Language | Python |
+| Deep Learning Framework | TensorFlow / Keras |
+| Model Architecture | DenseNet121 |
+| Data Processing | NumPy, Pandas |
+| Image Processing | TensorFlow Image API |
+| Data Visualization | Matplotlib, Seaborn |
+| Machine Learning Utilities | Scikit-learn |
+| Statistical Analysis | SciPy |
+| Dataset Access | Kaggle Competition / Kaggle CLI |
 
 ## Repository Structure
 
@@ -126,7 +182,7 @@ The row-normalized confusion matrix illustrates the classification performance a
 rice-leaf-disease-classification/
 │
 ├── README.md
-│
+├── requirements.txt
 ├── rice_leaf_disease_classification.ipynb
 │
 └── results/
@@ -135,36 +191,56 @@ rice-leaf-disease-classification/
         └── confusion_matrix.png
 ```
 
-## How to Run
+## Installation and Execution
 
-### Recommended Environment: Kaggle Notebooks
-
-1. Open the Kaggle Paddy Disease Classification competition.
-2. Accept the competition rules and ensure dataset access.
-3. Create a Kaggle notebook.
-4. Attach the Paddy Disease Classification dataset.
-5. Upload or import this repository's notebook.
-6. Run the notebook cells sequentially.
-
-### Local Environment
-
-Install the required libraries:
+### 1. Clone the Repository
 
 ```bash
-pip install tensorflow numpy pandas scikit-learn matplotlib seaborn scipy kaggle
+git clone https://github.com/sn-sakib/rice-leaf-disease-classification.git
+
+cd rice-leaf-disease-classification
 ```
 
-For local execution, download the dataset through Kaggle and configure the Kaggle API credentials. Ensure that the dataset directory is accessible to the notebook.
+### 2. Install Dependencies
 
-A compatible GPU is recommended for efficient training.
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Download the Dataset
+
+Access the [Kaggle Paddy Disease Classification competition](https://www.kaggle.com/competitions/paddy-disease-classification/data).
+
+Accept the competition rules and download the dataset.
+
+For automatic download through the Kaggle CLI, configure your Kaggle API credentials.
+
+### 4. Run the Notebook
+
+Open the notebook using Jupyter:
+
+```bash
+jupyter notebook rice_leaf_disease_classification.ipynb
+```
+
+Configure the dataset path if necessary, then execute the cells sequentially.
+
+A compatible GPU is recommended for efficient model training.
+
+## Experimental Scope and Limitations
+
+- The reported results are from one recorded stratified train-validation-test experiment.
+- Five-fold stratified cross-validation is implemented in the notebook but was not executed in the reported experiment.
+- The reported performance is based on the selected seven disease categories rather than all ten categories in the original competition dataset.
+- Further evaluation on independent datasets is needed to assess generalization beyond the selected dataset.
 
 ## Future Improvements
 
-- Conduct five-fold stratified cross-validation.
-- Evaluate generalization on independent rice disease datasets.
+- Execute five-fold stratified cross-validation to evaluate performance stability.
+- Evaluate the model on independent rice leaf disease datasets.
 - Investigate model explainability using Grad-CAM.
 - Compare DenseNet121 with alternative CNN and vision transformer architectures.
-- Explore model compression and deployment for real-world agricultural applications.
+- Explore model compression and deployment for practical agricultural applications.
 
 ## Author
 
